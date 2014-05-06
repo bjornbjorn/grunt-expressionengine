@@ -2,6 +2,8 @@
 
 > Handle upgrading of EE core and addons with Grunt
 
+This plugin is under development, if you have any questions [ask me on twitter](http://twitter.com/bjornbjorn).
+
 ## Getting Started
 This plugin requires Grunt `~0.4.2`
 
