@@ -1,0 +1,11 @@
+{
+    "ee_path"           : "../git/lf_expressionengine/ee/",
+    "ee_addons_path"    : "../git/lf_expressionengine/third_party/",
+    "webroot"           : "webroot",
+    "system"            : "system",
+    "third_party"       : "third_party",
+    "db_name"           : "ee_local",
+    "db_username"       : "eelocal",
+    "db_password"       : "eepwd",
+    "db_host"           : "localhost"
+}

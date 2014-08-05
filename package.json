@@ -1,7 +1,7 @@
 {
   "name": "grunt-expressionengine",
   "description": "Handle upgrading of EE core and addons with Grunt",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "homepage": "https://github.com/bjornbjorn/grunt-expressionengine",
   "author": {
     "name": "Bjørn Børresen",

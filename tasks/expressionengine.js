@@ -8,18 +8,19 @@
 
 'use strict';
 
-module.exports = function(grunt) {
+module.exports = function(grunt) {   
 
     grunt.initConfig({
         // Metadata.
         pkg: grunt.file.readJSON('package.json'),
         settings: grunt.file.readJSON('settings.json'),
+        target: grunt.option('target'),
 
         rename: {
         ee: {
             files: [
-                {src: ['<%= settings.system %>'], dest: 'backups/'+'<%= settings.system %>'},
-                {src: ['<%= settings.webroot %>/themes'], dest: 'backups/<%= settings.webroot %>/themes'}
+                {src: ['<%= settings.system %>'], dest: 'backups/'+'<%= ee_config.app_version %>/<%= settings.system %>'},
+                {src: ['<%= settings.webroot %>/themes'], dest: 'backups/<%= ee_config.app_version %>/<%= settings.webroot %>/themes'}
             ]
         }
     },
@@ -32,8 +33,8 @@ module.exports = function(grunt) {
                 {expand: true, cwd: '<%= settings.ee_path %>', src: ['themes/**'], dest: '<%= settings.webroot %>'},
                 {expand: true, cwd: 'backups/<%= settings.webroot %>/themes/', src: ['third_party/**'], dest: '<%= settings.webroot %>/themes'},
                 {expand: true, cwd: '<%= settings.ee_path %>', src: ['images/**'], dest: '<%= settings.webroot %>/images/'},
-                {expand: true, flatten:true, src: ['backups/'+'<%= settings.system %>/expressionengine/config/config.php'], dest: '<%= settings.system %>/expressionengine/config/'},
-                {expand: true, flatten:true, src: ['backups/'+'<%= settings.system %>/expressionengine/config/database.php'], dest: '<%= settings.system %>/expressionengine/config/'}
+                {expand: true, flatten:true, src: ['backups/'+'<%= ee_config.app_version %>/<%= settings.system %>/expressionengine/config/config.php'], dest: '<%= settings.system %>/expressionengine/config/'},
+                {expand: true, flatten:true, src: ['backups/'+'<%= ee_config.app_version %>/<%= settings.system %>/expressionengine/config/database.php'], dest: '<%= settings.system %>/expressionengine/config/'}
             ]
         },
 
@@ -44,6 +45,15 @@ module.exports = function(grunt) {
                 {expand: true, cwd: '<%= settings.ee_path %>', src: ['themes/**'], dest: '<%= settings.webroot %>'},
                 {expand: true, cwd: '<%= settings.ee_path %>', src: ['images/**'], dest: '<%= settings.webroot %>/images/'},
                 {expand: true, cwd: '<%= settings.ee_path %>', src: ['*.php'], dest: '<%= settings.webroot %>'}
+            ]
+        },
+
+        ee_target: {
+            files: [
+                {expand: true, cwd: 'backups/<%= target %>', src: ['<%= settings.system %>/**'], dest: './'},
+                {expand: true, cwd: 'backups/<%= target %>', src: ['themes/**'], dest: '<%= settings.webroot %>'},
+                {expand: true, cwd: 'backups/<%= target %>', src: ['images/**'], dest: '<%= settings.webroot %>/images/'},
+                {expand: true, cwd: 'backups/<%= target %>', src: ['*.php'], dest: '<%= settings.webroot %>'}
             ]
         }
     },
@@ -58,7 +68,7 @@ module.exports = function(grunt) {
                     "user": '<%= settings.db_username %>',
                     "pass": '<%= settings.db_password %>',
                     "host": '<%= settings.db_host %>',
-                    "backup_to": 'backups/db/<%= settings.db_name %>_<%= grunt.template.today("yyyy_mm_dd-HH_MM_ss") %>.sql'
+                    "backup_to": 'backups/<%= ee_config.app_version %>/db/<%= settings.db_name %>.sql'
             }
         }
     },
@@ -77,9 +87,54 @@ module.exports = function(grunt) {
             }
         }
     },
-    clean: ['<%= settings.system %>/installer', 'backups']
+
+   shell: {
+        load_ee_config: {
+            command: 'php -r \'error_reporting(0); DEFINE("BASEPATH", "<%= settings.system %>/codeigniter/system/"); include("<%= settings.system %>/expressionengine/config/config.php"); print json_encode($config);\'',
+            options: {
+                stdout: false,
+                callback: function(err, stdout, stderr, cb) {
+                    var ee_config = JSON.parse(stdout);
+                    grunt.config.set('ee_config', ee_config);
+                    cb();
+
+                    if(ee_config.app_version) {
+                        grunt.log.ok("Read EE config file successfully");                        
+                    } else {
+                        grunt.log.error("Could not get app_version from EE config (probably means the file "+ grunt.config.get('settings.system') +"/expressionengine/config/config.php could not be read)");                        
+                    }
+                }
+            }
+        },
+    },
+
+    clean: ['<%= settings.system %>/installer']
 
 });
+
+function prepare_backup_dirs() {
+    var ee_config = grunt.config.get('ee_config');
+    var backup_dir = 'backups/' + ee_config['app_version']; 
+
+    if(grunt.file.isDir(backup_dir)) {
+        grunt.log.error('Directory \''+backup_dir+'\' already exists - that\'s where I will store the backups. Please rename or delete it before running the upgrade');
+        return false;
+    }
+
+    if(!grunt.file.isDir(grunt.config.get('settings.system'))) {
+        grunt.log.error('Could not find system directory: ./'+grunt.config.get('settings.system'));
+        grunt.log.error('If this is not the correct directory update your settings.json file');
+        return false;
+    }
+
+    grunt.log.write('Creating backup directories ...');
+
+    grunt.file.mkdir('backups');
+    grunt.file.mkdir(backup_dir);
+    grunt.file.mkdir(backup_dir+'/db');
+    grunt.file.mkdir(backup_dir+'/'+grunt.config.get('settings.webroot'));
+    grunt.file.mkdir(backup_dir+'/'+grunt.config.get('settings.third_party'));
+};
 
 grunt.registerTask("update_addon", "Register a single addon", function(addon_name) {
     var third_party_dir = grunt.config.get('settings.third_party');
@@ -210,24 +265,7 @@ grunt.registerTask('init:ee_new', 'Install new EE', function() {
 
 
 grunt.registerTask('init:ee', 'Initialize EE upgrade (do backups)', function() {
-
-    if(grunt.file.isDir('backups')) {
-        grunt.log.error('Directory \'backups\' already exists - that\'s where I will store the backups. Please rename or delete it before running the upgrade');
-        return false;
-    }
-
-    if(!grunt.file.isDir(grunt.config.get('settings.system'))) {
-        grunt.log.error('Could not find system directory: ./'+grunt.config.get('settings.system'));
-        grunt.log.error('If this is not the correct directory update your settings.json file');
-        return false;
-    }
-
-    grunt.log.write('Creating backup directories ...');
-
-    grunt.file.mkdir('backups');
-    grunt.file.mkdir('backups/db');
-    grunt.file.mkdir('backups/'+grunt.config.get('settings.webroot'));
-    grunt.file.mkdir('backups/'+grunt.config.get('settings.third_party'));
+    prepare_backup_dirs();
 });
 
 /**
@@ -243,19 +281,63 @@ grunt.registerTask('set_permissions:ee', 'Sets permissions on files', function()
 });
 
 
-grunt.task.registerTask('install:ee',['init:ee_new', 'copy:ee_new']);
-grunt.task.registerTask('update:ee', ['init:ee', 'db_dump:ee', 'rename:ee', 'copy:ee', 'set_permissions:ee', 'prompt:ee']);
-grunt.task.registerTask('update:addons', ['update_addons']);
-grunt.task.registerTask('update:addon', ['update_addon']);
+grunt.registerTask('info_ee', 'Output info about the current EE install', function() {
+    var ee_config = grunt.config.get('ee_config');
+    for(var key in ee_config) {
+        grunt.log.writeln(key + ': ' + ee_config[key]);
+    }
+});
 
-grunt.task.registerTask('clean', 'clean');
+grunt.registerTask('version_ee', 'Output current EE version', function() {
+    var ee_config = grunt.config.get('ee_config');
+    grunt.log.subhead('EE Version: ' + ee_config['app_version']);
+});
+
+grunt.registerTask('switch_ee', 'Switch between available (backuped) EE versions', function() {
+    var ee_config = grunt.config.get('ee_config');
+    grunt.log.subhead("Current EE Version: " + ee_config['app_version']);
+
+    var available_backups = [];
+    grunt.file.expand({'cwd':'backups'},"*").forEach(function(dir){
+        grunt.log.writeln(dir);
+        available_backups.push(dir);
+    });
+
+    if(available_backups.length == 0) {
+        grunt.log.writeln("No backups available to switch to");
+    } else {
+        var target = grunt.option('target');
+        if(!target) {
+            grunt.log.writeln("\nTo switch to a specific EE version please specify target version to switch to, e.g. grunt ee:switch --target=" + available_backups[0]);
+        } else {
+            if(ee_config['app_version'] != target) {
+                grunt.log.writeln("Backing up " + ee_config['app_version']+ " ...");
+                prepare_backup_dirs();
+                grunt.task.run('db_dump:ee');
+                grunt.task.run('rename:ee');
+                grunt.task.run('copy:ee_target');
+            }
+
+        }        
+    }
+});
+
+grunt.task.registerTask('ee:info', ['shell:load_ee_config', 'info_ee']);
+grunt.task.registerTask('ee:version', ['shell:load_ee_config', 'version_ee']);
+grunt.task.registerTask('ee:install',['init:ee_new', 'copy:ee_new', 'set_permissions:ee']);
+grunt.task.registerTask('ee:update', ['shell:load_ee_config','init:ee', 'db_dump:ee', 'rename:ee', 'copy:ee', 'set_permissions:ee', 'prompt:ee']);
+grunt.task.registerTask('ee:update:addons', ['update_addons']);
+grunt.task.registerTask('ee:update:addon', ['update_addon']);
+grunt.task.registerTask('ee:switch', ['shell:load_ee_config', 'switch_ee']);
+
+grunt.task.registerTask('ee:clean', 'clean');
 
 grunt.loadNpmTasks('grunt-contrib-copy');
 grunt.loadNpmTasks('grunt-contrib-rename');
 grunt.loadNpmTasks('grunt-prompt');
 grunt.loadNpmTasks('grunt-contrib-clean');
 grunt.loadNpmTasks('grunt-mysql-dump');
-
+grunt.loadNpmTasks('grunt-shell');
 
 
 };
