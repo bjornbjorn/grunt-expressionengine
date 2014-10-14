@@ -90,7 +90,7 @@ module.exports = function(grunt) {
 
    shell: {
         load_ee_config: {
-            command: 'php -r \'error_reporting(0); DEFINE("BASEPATH", "<%= settings.system %>/codeigniter/system/"); include("<%= settings.system %>/expressionengine/config/config.php"); print json_encode($config);\'',
+            command: 'php -r \'error_reporting(0); DEFINE("APPPATH", "<%= settings.system %>/expressionengine/"); DEFINE("BASEPATH", "<%= settings.system %>/codeigniter/system/"); include("<%= settings.system %>/expressionengine/config/config.php"); print json_encode($config);\'',
             options: {
                 stdout: false,
                 callback: function(err, stdout, stderr, cb) {
