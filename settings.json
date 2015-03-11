@@ -5,7 +5,7 @@
     "system"            : "system",
     "third_party"       : "third_party",
     "db_name"           : "ee_local",
-    "db_username"       : "eelocal",
-    "db_password"       : "eepwd",
+    "db_username"       : "ee_local",
+    "db_password"       : "ee_local",
     "db_host"           : "localhost"
 }
