@@ -15,10 +15,8 @@
 
 module.exports = function(grunt) {
 
-
     grunt.initConfig({
         // Metadata.
-        pkg: grunt.file.readJSON('package.json'),
         settings: grunt.file.readJSON('settings.json'),
         target: grunt.option('target'),
 
@@ -72,6 +70,13 @@ module.exports = function(grunt) {
                     {expand: true, cwd: 'backups/<%= target %>', src: ['themes/**'], dest: '<%= settings.webroot %>'},
                     {expand: true, cwd: 'backups/<%= target %>', src: ['images/**'], dest: '<%= settings.webroot %>/images/'},
                     {expand: true, cwd: 'backups/<%= target %>', src: ['*.php'], dest: '<%= settings.webroot %>'}
+                ]
+            },
+
+            override_css: {
+                files: [
+                    {expand:true, src: ['<%= ee_backup_dir %>/<%= settings.webroot %>/themes/cp_themes/default/css/override.css'], dest: '<%= settings.webroot %>/themes/cp_themes/default/css/'},
+                    {expand:true, src: ['<%= ee_backup_dir %>/<%= settings.webroot %>/themes/cp_themes/default/css/login.css'], dest: '<%= settings.webroot %>/themes/cp_themes/default/css/'},
                 ]
             }
 
@@ -137,8 +142,6 @@ function prepare_backup_dirs(postfix) {
         }
 
         grunt.log.writeln('Directory '+original_backup_dir+'/ already existed - chose ' + backup_dir+ '/ instead');
-    } else {
-
     }
 
     if(!grunt.file.isDir(grunt.config.get('settings.system'))) {
@@ -161,7 +164,7 @@ function prepare_backup_dirs(postfix) {
 };
 
 
-grunt.registerTask("update_addon", "Update a single addon", function(addon_name) {
+    grunt.registerTask("update_addon", "Update a single addon", function(addon_name) {
     var third_party_dir = grunt.config.get('settings.third_party');
 
     // If addon name is sent as a parameter, that takes presence
@@ -357,6 +360,21 @@ grunt.registerTask('switch_ee', 'Switch between available (backuped) EE versions
 });
 
 
+/**
+ * This function will copy override.css from backup to the new install
+ */
+grunt.registerTask('override_css', 'Copy override.css back in', function() {
+    var backup_dir = grunt.config.get('ee_backup_dir');
+    var webroot = grunt.config.get('settings.webroot');
+
+    if(grunt.file.isFile(backup_dir+'/'+webroot+'/themes/cp_themes/default/css/override.css')) {
+        grunt.log.writeln("Found override.css in default cp theme, copying that back in");
+        grunt.config.set('override_css_file', backup_dir+'/'+webroot+'/themes/cp_themes/default/css/override.css' );
+        grunt.task.run('copy:override_css');
+    }
+
+});
+
 grunt.registerTask('maybe_delete_ee_installer', 'Maybe delete EEE installer', function() {
     var delete_installer = grunt.config.get('delete_ee_installer');
     if(delete_installer) {
@@ -366,11 +384,23 @@ grunt.registerTask('maybe_delete_ee_installer', 'Maybe delete EEE installer', fu
 
 grunt.task.registerTask('ee:info', ['info_ee']);
 grunt.task.registerTask('ee:install',['init:ee_new', 'copy:ee_new', 'set_permissions:ee']);
-grunt.task.registerTask('ee:update', ['ee:info','init:ee', 'db_dump:ee', 'rename:ee', 'copy:ee', 'set_permissions:ee', 'rename:third_party', 'prompt:ee', 'rename:third_party_back', 'maybe_delete_ee_installer']);
+grunt.task.registerTask('ee:update', [
+    'ee:info',
+    'init:ee',
+    'db_dump:ee',
+    'rename:ee',
+    'copy:ee',
+    'set_permissions:ee',
+    'rename:third_party',
+    'prompt:ee',
+    'rename:third_party_back',
+    'maybe_delete_ee_installer',
+    'override_css'
+    ]
+);
 grunt.task.registerTask('ee:update:addons', ['update_addons']);
 grunt.task.registerTask('ee:update:addon', ['ee:info', 'update_addon']);
 grunt.task.registerTask('ee:switch', ['ee:info', 'copy:third_party_back']);
-//grunt.task.registerTask('ee:test', ['ee:info', 'init:ee', 'copy:third_party_back']);
 
 grunt.task.registerTask('ee:clean', 'clean');
 
